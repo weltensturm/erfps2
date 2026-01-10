@@ -55,7 +55,7 @@ pub fn set_panic_hook() {
 #[macro_export]
 macro_rules! log_unwind {
     ($($t:tt)*) => {
-        crate::logger::do_log_unwind(|| $($t)*, file!(), line!(), stringify!($($t)*))
+        $crate::logger::do_log_unwind(|| $($t)*, file!(), line!(), stringify!($($t)*))
     };
 }
 

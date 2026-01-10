@@ -91,7 +91,8 @@ unsafe fn hook_shader_cb(program: Program) -> eyre::Result<()> {
     // 08 DQ `fisheye_distortion_cb_hook``
     // 10 ...
     let cb_hook_buf = {
-        let [b0, b1, b2, b3, b4, b5, b6, b7] = u64::to_le_bytes(fisheye_distortion_cb_hook as u64);
+        let [b0, b1, b2, b3, b4, b5, b6, b7] =
+            u64::to_le_bytes(fisheye_distortion_cb_hook as usize as u64);
         [
             0xff, 0x15, 0x02, 0x00, 0x00, 0x00, 0xeb, 0x08, b0, b1, b2, b3, b4, b5, b6, b7,
         ]
