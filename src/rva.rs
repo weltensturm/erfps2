@@ -4,7 +4,6 @@ pub const UPDATE_FOLLOW_CAM_RVA: u32 = 0x3b7670;
 pub const GET_DMY_POS_RVA: u32 = 0x3e95e0;
 
 pub const POSTURE_CONTROL_RIGHT_RVA: u32 = 0x40fef0;
-pub const POSTURE_CONTROL_LEFT_RVA: u32 = 0x40fff0;
 
 pub const PUSH_TAE700_MODIFIER_RVA: u32 = 0x416d40;
 

@@ -1,4 +1,4 @@
-use eldenring::cs::{ChrIns, PlayerIns, ThrowNodeState, WorldChrMan};
+use eldenring::cs::{ChrAsmArmStyle, ChrIns, PlayerIns, ThrowNodeState, WorldChrMan};
 use fromsoftware_shared::{F32ModelMatrix, F32Vector4, F32ViewMatrix, FromStatic};
 use glam::Vec4;
 
@@ -29,6 +29,8 @@ pub trait PlayerExt {
     fn is_on_ladder(&self) -> bool;
 
     fn is_in_throw(&self) -> bool;
+
+    fn is_2h(&self) -> bool;
 }
 
 impl PlayerExt for PlayerIns {
@@ -123,6 +125,13 @@ impl PlayerExt for PlayerIns {
         matches!(
             self.module_container.throw.throw_node.throw_state,
             ThrowNodeState::InThrowTarget | ThrowNodeState::InThrowAttacker
+        )
+    }
+
+    fn is_2h(&self) -> bool {
+        matches!(
+            self.chr_asm.equipment.arm_style,
+            ChrAsmArmStyle::LeftBothHands | ChrAsmArmStyle::RightBothHands
         )
     }
 }

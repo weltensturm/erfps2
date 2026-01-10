@@ -13,9 +13,9 @@ use crate::{
     player::PlayerExt,
     program::Program,
     rva::{
-        CAMERA_STEP_UPDATE_RVA, MMS_UPDATE_CHR_CAM_RVA, POSTURE_CONTROL_LEFT_RVA,
-        POSTURE_CONTROL_RIGHT_RVA, PUSH_TAE700_MODIFIER_RVA, SET_WWISE_LISTENER_RVA,
-        UPDATE_FOLLOW_CAM_RVA, UPDATE_LOCK_TGT_RVA,
+        CAMERA_STEP_UPDATE_RVA, MMS_UPDATE_CHR_CAM_RVA, POSTURE_CONTROL_RIGHT_RVA,
+        PUSH_TAE700_MODIFIER_RVA, SET_WWISE_LISTENER_RVA, UPDATE_FOLLOW_CAM_RVA,
+        UPDATE_LOCK_TGT_RVA,
     },
 };
 
@@ -122,24 +122,16 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
                 POSTURE_CONTROL_RIGHT_RVA,
             );
 
-        let posture_control_left = program
-            .derva_ptr::<unsafe extern "C" fn(*mut c_void, u8, i32, i32) -> i32>(
-                POSTURE_CONTROL_LEFT_RVA,
-            );
-
-        for posture_control in [posture_control_right, posture_control_left] {
-            HookInstaller::for_function(posture_control)
-                .enable(true)
-                .install(|original| {
-                    move |param_1, param_2, param_3, param_4| {
-                        let first_person = CameraControl::lock().first_person();
-                        let posture_angle = if first_person { 5 } else { 0 };
-                        original(param_1, param_2, param_3, param_4) + posture_angle
-                    }
-                })
-                .map(mem::forget)
-                .unwrap();
-        }
+        HookInstaller::for_function(posture_control_right)
+            .enable(true)
+            .install(|original| {
+                move |param_1, param_2, param_3, param_4| {
+                    let posture_angle = hand_posture_control().unwrap_or(0);
+                    original(param_1, param_2, param_3, param_4) + posture_angle
+                }
+            })
+            .map(mem::forget)
+            .unwrap();
     }
 
     Ok(())
@@ -237,4 +229,16 @@ unsafe fn tae700_override(args: &mut [f32; 8]) {
 
     args[4] = 0.0;
     args[5] = 0.0;
+}
+
+#[cfg_attr(debug_assertions, libhotpatch::hotpatch)]
+unsafe fn hand_posture_control() -> Option<i32> {
+    let control = CameraControl::lock();
+    let player = PlayerIns::main_player()?;
+
+    if !control.first_person() || player.is_2h() {
+        return None;
+    }
+
+    Some(15)
 }
