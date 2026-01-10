@@ -1,0 +1,24 @@
+[package]
+name = "erfps2"
+version = "0.1.0"
+edition = "2024"
+authors = ["Dasaav"]
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+eldenring.path = "fromsoftware-rs/crates/eldenring"
+eyre = "0.6.12"
+fromsoftware-shared.path = "fromsoftware-rs/crates/shared"
+glam = "0.30.9"
+simplelog = { version = "0.12.2", default-features = false }
+libhotpatch = { version = "1.1.0", default-features = false }
+log = "0.4.28"
+windows = { version = "0.62.2", features = [
+    "Win32_System_SystemServices",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+] }
+winhook = "0.1.1"

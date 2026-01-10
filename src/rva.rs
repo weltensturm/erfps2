@@ -1,0 +1,23 @@
+pub const CAMERA_STEP_UPDATE_RVA: u32 = 0x3bc6f0;
+pub const UPDATE_FOLLOW_CAM_RVA: u32 = 0x3b7670;
+
+pub const GET_DMY_POS_RVA: u32 = 0x3e95e0;
+
+pub const POSTURE_CONTROL_RIGHT_RVA: u32 = 0x40fef0;
+pub const POSTURE_CONTROL_LEFT_RVA: u32 = 0x40fff0;
+
+pub const PUSH_TAE700_MODIFIER_RVA: u32 = 0x416d40;
+
+pub const IS_CHR_RIDING_RVA: u32 = 0x474900;
+
+pub const UPDATE_LOCK_TGT_RVA: u32 = 0x716360;
+pub const MMS_UPDATE_CHR_CAM_RVA: u32 = 0xb02480;
+
+pub const ADD_PIXEL_SHADER_RVA: u32 = 0xb7a990;
+
+pub const SET_WWISE_LISTENER_RVA: u32 = 0xda9400;
+
+pub const USES_DITHERING_RVA: u32 = 0x1a679e0;
+pub const CB_FISHEYE_HOOK_RVA: u32 = 0x1b90b1a;
+
+pub const CAM_WALL_RECOVERY_RVA: u32 = 0x3b15c80;
