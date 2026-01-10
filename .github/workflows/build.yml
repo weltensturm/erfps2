@@ -16,6 +16,9 @@ jobs:
       with:
         submodules: "true"
 
+    - name: Install DXC
+      run: nuget install Microsoft.Direct3D.DXC
+
     - name: Cache
       uses: actions/cache@v5
       with:
