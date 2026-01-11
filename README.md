@@ -10,6 +10,7 @@ This mod aims to convert the game into a proper first person experience, with th
 - Custom barrel distortion shader to reduce FOV distortion in first person inspired by [an article by Giliam de Carpentier](https://www.decarpentier.nl/lens-distortion).
 - Accurate free aim (complete with a crosshair).
 - Full body animations with minimal camera clipping, while preserving the shadow of the player's helmet and head.
+- Runtime config editing (erfps2.toml) that is instantly reflected in game.
 
 ## Controls
 
@@ -24,6 +25,8 @@ Launch the me3 mod profile directly or with the me3 CLI:
 ```
 me3 launch -g eldenring -p erfps2.me3
 ```
+
+You may edit `erfps2.toml` to your preference. Keep it in the same directory as `erfps2.dll` and do not remove any fields.
 
 ## Developer quickstart
 
