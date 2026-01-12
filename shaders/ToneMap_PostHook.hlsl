@@ -103,7 +103,7 @@ float2 MapUvBarrel(float2 uv)
 bool CrosshairTest(float2 uv)
 {
     float2 c = uv - 0.5;
-    float2 cScreen = c * g_vChromaticAberrationShapeParam.xy * g_dynamicScreenPercentage;
+    float2 cScreen = c * float2(g_vCameraParam.x, 1.0) * g_dynamicScreenPercentage;
 
     int crosshairKind = (g_ErfpsFlags >> 2) & 3;
     switch (crosshairKind)
