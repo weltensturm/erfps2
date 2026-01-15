@@ -1,9 +1,8 @@
 use std::{
-    cell::LazyCell,
     collections::VecDeque,
     mem,
     ops::{Deref, DerefMut},
-    sync::Mutex,
+    sync::{LazyLock, RwLock},
 };
 
 use eldenring::cs::{
@@ -87,11 +86,12 @@ struct CameraStabilizer {
 }
 
 impl CameraControl {
-    pub fn scope<F: FnOnce(&mut CameraControl) -> R, R>(f: F) -> R {
-        static STATE: Mutex<LazyCell<CameraControl>> =
-            Mutex::new(LazyCell::new(CameraControl::new));
+    pub fn scope<F: FnOnce(&CameraControl) -> R, R>(f: F) -> R {
+        f(&Self::get().read().unwrap())
+    }
 
-        f(&mut STATE.lock().unwrap())
+    pub fn scope_mut<F: FnOnce(&mut CameraControl) -> R, R>(f: F) -> R {
+        f(&mut Self::get().write().unwrap())
     }
 
     fn new() -> Self {
@@ -112,6 +112,12 @@ impl CameraControl {
             context: None,
             updater,
         }
+    }
+
+    fn get() -> &'static RwLock<CameraControl> {
+        static S: LazyLock<RwLock<CameraControl>> =
+            LazyLock::new(|| RwLock::new(CameraControl::new()));
+        &S
     }
 
     pub fn state_and_context(&mut self) -> (&mut CameraState, Option<&mut CameraContext>) {
@@ -372,9 +378,7 @@ impl CameraContext {
     }
 
     pub fn has_state(&self, name: &str) -> bool {
-        self.behavior_states
-            .iter()
-            .any(|state| &**state == name)
+        self.behavior_states.iter().any(|state| &**state == name)
     }
 }
 

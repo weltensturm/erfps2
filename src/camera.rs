@@ -208,7 +208,7 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
 
 #[cfg_attr(debug_assertions, libhotpatch::hotpatch)]
 unsafe fn update_camera(tpf: f32, original: &dyn Fn()) {
-    let camera_updated = CameraControl::scope(|control| {
+    let camera_updated = CameraControl::scope_mut(|control| {
         control.tpf = tpf;
 
         if control.first_person()
@@ -228,7 +228,7 @@ unsafe fn update_camera(tpf: f32, original: &dyn Fn()) {
 
 #[cfg_attr(debug_assertions, libhotpatch::hotpatch)]
 unsafe fn update_move_map_step(original: &dyn Fn()) {
-    CameraControl::scope(|control| {
+    CameraControl::scope_mut(|control| {
         control.next_frame();
 
         if let (state, Some(context)) = control.state_and_context() {
@@ -244,7 +244,7 @@ unsafe fn update_move_map_step(original: &dyn Fn()) {
 unsafe fn update_lock_tgt(original: &dyn Fn()) {
     original();
 
-    CameraControl::scope(|control| {
+    CameraControl::scope_mut(|control| {
         if control.first_person()
             && let (state, Some(context)) = control.state_and_context()
             && !state.can_transition()
@@ -260,7 +260,7 @@ unsafe fn update_lock_tgt(original: &dyn Fn()) {
 
 #[cfg_attr(debug_assertions, libhotpatch::hotpatch)]
 unsafe fn update_chr_follow_cam(follow_cam: &mut ChrExFollowCam, original: &dyn Fn()) {
-    CameraControl::scope(|control| control.state_and_context().0.update_follow_cam(follow_cam));
+    CameraControl::scope_mut(|control| control.state_and_context().0.update_follow_cam(follow_cam));
 
     original();
 
@@ -317,7 +317,7 @@ unsafe fn root_motion_modifier(
     let is_main_player = ptr::addr_eq(some_chr, main_player);
 
     if !is_main_player
-        || !CameraControl::scope(|control| {
+        || !CameraControl::scope_mut(|control| {
             let context = control.first_person().then(|| control.state_and_context());
             matches!(context, Some((_, Some(context))) if context.has_state("Attack_SM"))
         })
@@ -352,7 +352,7 @@ unsafe fn update_player_behavior_state(state_machine: *mut c_void, behavior_grap
         if !name.is_null()
             && let Ok(name) = unsafe { CStr::from_ptr(name).to_str() }
         {
-            CameraControl::scope(|control| {
+            CameraControl::scope_mut(|control| {
                 if let (_, Some(context)) = control.state_and_context() {
                     context.behavior_states.push(name.into());
                 }
