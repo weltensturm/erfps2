@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.6] 2026-01-15
+
+### Added
+
+- Ability to influence move direction when attacking.
+- `gameplay.unlocked_movement` erfps2.toml key.
+
+### Changed
+
+- Camera head offsets to reduce clipping.
+
+### Fixed
+
+- Being able to unintentionally rotate when a gesture animation loops.
+
 ## [0.1.5] 2026-01-13
 
 ### Added
