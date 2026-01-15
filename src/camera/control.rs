@@ -450,8 +450,8 @@ impl Default for CameraState {
             use_barrel_correction: false,
             correction_strength: 0.5,
             saved_angle_limit: None,
-            in_head_offset_y: 0.07,
-            in_head_offset_z: 0.0,
+            in_head_offset_y: 0.075,
+            in_head_offset_z: -0.025,
         }
     }
 }
