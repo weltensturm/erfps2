@@ -1,7 +1,6 @@
 use std::{
     arch::naked_asm,
     ffi::c_void,
-    mem,
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 
@@ -9,10 +8,10 @@ use windows::{
     Win32::System::Memory::{PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS, VirtualProtect},
     core::PCWSTR,
 };
-use winhook::HookInstaller;
 
 use crate::{
     config::CrosshairKind,
+    hook,
     program::Program,
     rva::{
         ADD_PIXEL_SHADER_RVA, CB_FISHEYE_HOOK_RVA, GX_FFX_DRAW_CONTEXT_RVA, GX_FFX_DRAW_PASS_RVA,
@@ -31,38 +30,32 @@ pub fn hook_shaders(program: Program) -> eyre::Result<()> {
             usize,
         ) -> *mut c_void>(ADD_PIXEL_SHADER_RVA);
 
-        HookInstaller::for_function(add_pixel_shader)
-            .enable(true)
-            .install(|original| {
-                move |repository, name, mut blob, mut len| {
-                    if name
-                        .to_string()
-                        .is_ok_and(|name| name == "ToneMap_PostOETFPS")
-                    {
-                        blob = TONE_MAP_HOOK.as_ptr();
-                        len = TONE_MAP_HOOK.len();
-                    }
-
-                    original(repository, name, blob, len)
+        hook::install(add_pixel_shader, |original| {
+            move |repository, name, mut blob, mut len| {
+                if name
+                    .to_string()
+                    .is_ok_and(|name| name == "ToneMap_PostOETFPS")
+                {
+                    blob = TONE_MAP_HOOK.as_ptr();
+                    len = TONE_MAP_HOOK.len();
                 }
-            })
-            .map(mem::forget)
-            .unwrap();
+
+                original(repository, name, blob, len)
+            }
+        })
+        .unwrap();
 
         let uses_dithering = program
             .derva_ptr::<unsafe extern "C" fn(*const c_void, *mut c_void, u32) -> bool>(
                 USES_DITHERING_RVA,
             );
 
-        HookInstaller::for_function(uses_dithering)
-            .enable(true)
-            .install(|original| {
-                move |param_1, param_2, param_3| {
-                    ENABLE_DITHERING.load(Ordering::Relaxed) && original(param_1, param_2, param_3)
-                }
-            })
-            .map(mem::forget)
-            .unwrap();
+        hook::install(uses_dithering, |original| {
+            move |param_1, param_2, param_3| {
+                ENABLE_DITHERING.load(Ordering::Relaxed) && original(param_1, param_2, param_3)
+            }
+        })
+        .unwrap();
 
         hook_shader_cb(program)?;
 
@@ -168,19 +161,16 @@ unsafe fn patch_vfx_range(program: Program) -> eyre::Result<()> {
                 GX_FFX_DRAW_PASS_RVA,
             );
 
-        HookInstaller::for_function(ffx_draw_pass)
-            .enable(true)
-            .install(|original| {
-                move |param_1, param_2| {
-                    if !ENABLE_VFX_FADE.load(Ordering::Relaxed) {
-                        return false;
-                    }
-
-                    original(param_1, param_2)
+        hook::install(ffx_draw_pass, |original| {
+            move |param_1, param_2| {
+                if !ENABLE_VFX_FADE.load(Ordering::Relaxed) {
+                    return false;
                 }
-            })
-            .map(mem::forget)
-            .unwrap();
+
+                original(param_1, param_2)
+            }
+        })
+        .unwrap();
 
         // or eax,-1
         // vcvtsi2ss xmm11,xmm11,eax

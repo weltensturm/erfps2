@@ -9,6 +9,7 @@ use crate::{camera::init_camera_update, program::Program, shaders::hook_shaders}
 
 mod camera;
 mod config;
+mod hook;
 mod logger;
 mod player;
 mod program;
