@@ -253,6 +253,7 @@ unsafe fn update_lock_tgt(original: &dyn Fn()) {
             && !context.player.is_riding()
             && !context.player.is_on_ladder()
             && !context.player.is_in_throw()
+            && !context.has_state("Gesture_SM")
         {
             context.player.set_lock_on(true);
         }
