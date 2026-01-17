@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.8] 2026-01-17
+
+### Added
+
+- Optional (off by default) head tracking for rolls.
+- `gameplay.track_dodges` erfps2.toml key.
+
+### Changed
+
+- Ladders to no longer have head tracking.
+
+### Fixed
+
+- Trying to move the camera in throws snapping the look direction after the animation finishes.
+- Ladders completely locking the camera movement.
+- `libhotpatch` reloads correctly write to the log file.
+
 ## [0.1.7] 2026-01-16
 
 ### Added
