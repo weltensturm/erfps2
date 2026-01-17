@@ -22,11 +22,13 @@ pub trait PlayerExt {
 
     fn enable_face_model(&mut self, state: bool);
 
+    fn has_action_request(&self) -> bool;
+
     fn is_sprinting(&self) -> bool;
 
     fn is_riding(&self) -> bool;
 
-    fn is_on_ladder(&self) -> bool;
+    fn is_approaching_ladder(&self) -> bool;
 
     fn is_in_throw(&self) -> bool;
 
@@ -110,6 +112,14 @@ impl PlayerExt for PlayerIns {
         }
     }
 
+    fn has_action_request(&self) -> bool {
+        self.module_container
+            .event
+            .ez_state_requests_state
+            .iter()
+            .any(|i| *i >= 0)
+    }
+
     fn is_sprinting(&self) -> bool {
         // FIXME: not sure this is reliable?
         self.module_container.action_request.action_timers.roll > 0.3
@@ -123,8 +133,9 @@ impl PlayerExt for PlayerIns {
         }
     }
 
-    fn is_on_ladder(&self) -> bool {
-        self.module_container.event.ladder_state >= 0
+    fn is_approaching_ladder(&self) -> bool {
+        self.module_container.ladder.ladder_state == 0
+            || self.module_container.ladder.ladder_state == 1
     }
 
     fn is_in_throw(&self) -> bool {

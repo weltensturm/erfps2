@@ -217,7 +217,7 @@ unsafe fn update_lock_tgt(original: &dyn Fn()) {
             && !state.can_transition()
             && !context.player.is_sprinting()
             && !context.player.is_riding()
-            && !context.player.is_on_ladder()
+            && !context.player.has_action_request()
             && !context.player.is_in_throw()
             && !context.has_state("Gesture_SM")
         {

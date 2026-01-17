@@ -185,6 +185,13 @@ impl CameraState {
                 if angle_limit[1] != self.angle_limit[1] {
                     self.saved_angle_limit = Some(angle_limit[1]);
                 }
+
+                if let Some(player) = PlayerIns::main_player()
+                    && player.is_approaching_ladder()
+                {
+                    follow_cam.reset_camera_y = true;
+                    follow_cam.reset_camera_x = true;
+                }
             } else if let Some(saved_angle_limit) = self.saved_angle_limit.take() {
                 follow_cam.angle_limit[1] = saved_angle_limit;
             }
@@ -325,7 +332,6 @@ impl CameraContext {
 
         let tracking_rotation = if (state.track_dodges && (self.has_state("Evasion_SM")))
             || self.player.is_in_throw()
-            || self.player.is_on_ladder()
         {
             self.head_tracker.next_tracked(frame, head_pos.rotation())
         } else {
