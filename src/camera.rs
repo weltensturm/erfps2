@@ -328,7 +328,7 @@ unsafe fn update_player_behavior_state(state_machine: *mut c_void, behavior_grap
         {
             CameraControl::scope_mut(|control| {
                 if let (_, Some(context)) = control.state_and_context() {
-                    context.behavior_states.push(name.into());
+                    context.push_state(name);
                 }
             });
         }

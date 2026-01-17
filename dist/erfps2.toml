@@ -27,6 +27,9 @@ unlocked_movement = true
 # When an enemy is on screen lock on will be prioritized to switching perspectives.
 prioritize_lock_on = true
 
+# Camera movement will be synchronized with head movement for dodges.
+track_dodges = false
+
 [stabilizer]
 # Stabilization of camera movement in first person.
 enabled = true

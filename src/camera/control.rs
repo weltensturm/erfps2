@@ -9,7 +9,7 @@ use eldenring::cs::{
     CSActionButtonMan, CSCamera, CSRemo, ChrCam, ChrExFollowCam, PlayerIns, WorldChrMan,
 };
 use fromsoftware_shared::{F32ViewMatrix, FromStatic};
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat3A, Mat4, Quat, Vec3, Vec4};
 
 use crate::{
     config::{Config, CrosshairKind, FovCorrection, updater::ConfigUpdater},
@@ -44,6 +44,8 @@ pub struct CameraState {
 
     pub use_stabilizer: bool,
 
+    pub track_dodges: bool,
+
     pub stabilizer_window: f32,
 
     pub stabilizer_factor: f32,
@@ -70,9 +72,14 @@ pub struct CameraContext {
     pub chr_cam: &'static mut ChrCam,
     pub lock_tgt: &'static mut LockTgtMan,
     pub player: &'static mut PlayerIns,
-    pub behavior_states: Vec<Box<str>>,
+    persistent_context: PersistentCameraContext,
+}
+
+pub struct PersistentCameraContext {
     frame: u64,
     stabilizer: CameraStabilizer,
+    head_tracker: HeadTracker,
+    behavior_states: BehaviorStates,
 }
 
 #[repr(C)]
@@ -87,6 +94,17 @@ struct CameraStabilizer {
     frame: u64,
     samples: u32,
     buf: VecDeque<Vec3>,
+}
+
+struct HeadTracker {
+    frame: u64,
+    last: Quat,
+    rotation: Quat,
+}
+
+struct BehaviorStates {
+    state_names: Vec<Box<str>>,
+    erase_index: usize,
 }
 
 impl CameraControl {
@@ -139,7 +157,7 @@ impl CameraControl {
     pub fn next_frame(&mut self) {
         if let Some(context) = &mut self.context {
             context.frame += 1;
-            context.behavior_states.clear();
+            context.behavior_states.next_frame();
         }
     }
 }
@@ -166,13 +184,6 @@ impl CameraState {
 
                 if angle_limit[1] != self.angle_limit[1] {
                     self.saved_angle_limit = Some(angle_limit[1]);
-                }
-
-                if let Some(player) = PlayerIns::main_player()
-                    && player.is_on_ladder()
-                {
-                    follow_cam.reset_camera_y = true;
-                    follow_cam.reset_camera_x = true;
                 }
             } else if let Some(saved_angle_limit) = self.saved_angle_limit.take() {
                 follow_cam.angle_limit[1] = saved_angle_limit;
@@ -209,11 +220,11 @@ impl CameraState {
         let lock_tgt = unsafe { LockTgtMan::instance().ok()? };
         let player = world_chr_man.main_player.as_deref_mut()?;
 
-        let (behavior_states, frame, stabilizer) = context
-            .map(|context| (context.behavior_states, context.frame, context.stabilizer))
+        let persistent_context = context
+            .map(|context| context.persistent_context)
             .unwrap_or_else(|| {
                 let samples = self.stabilizer_window / self.tpf;
-                (vec![], 0, CameraStabilizer::new(samples.ceil() as u32))
+                PersistentCameraContext::new(samples.ceil() as u32)
             });
 
         Some(CameraContext {
@@ -221,9 +232,7 @@ impl CameraState {
             chr_cam,
             lock_tgt,
             player,
-            behavior_states,
-            frame,
-            stabilizer,
+            persistent_context,
         })
     }
 
@@ -292,6 +301,8 @@ impl CameraContext {
     }
 
     pub fn camera_position(&mut self, state: &CameraState) -> F32ViewMatrix {
+        let frame = self.frame;
+
         let mut head_pos = self.player.head_position();
         let mut new_head_pos = Vec4::from(head_pos.3).truncate();
 
@@ -301,7 +312,7 @@ impl CameraContext {
                 .inverse()
                 .transform_point3(head_pos.translation());
 
-            let stabilized = self.stabilizer.next(self.frame, abs_head_pos);
+            let stabilized = self.stabilizer.next(frame, abs_head_pos);
             let delta = stabilized - abs_head_pos;
 
             new_head_pos = player_pos.transform_point3(
@@ -312,24 +323,26 @@ impl CameraContext {
         new_head_pos += Vec4::from(head_pos.1).truncate() * -0.1;
         head_pos.3 = new_head_pos.extend(1.0).into();
 
-        let mut camera_pos = if self.player.is_on_ladder() || self.player.is_in_throw() {
-            head_pos
+        let tracking_rotation = if (state.track_dodges && (self.has_state("Evasion_SM")))
+            || self.player.is_in_throw()
+            || self.player.is_on_ladder()
+        {
+            self.head_tracker.next_tracked(frame, head_pos.rotation())
         } else {
-            F32ViewMatrix::new(
-                self.chr_cam.pers_cam.matrix.0,
-                self.chr_cam.pers_cam.matrix.1,
-                self.chr_cam.pers_cam.matrix.2,
-                head_pos.3,
-            )
+            self.head_tracker.next_untracked(frame, head_pos.rotation())
         };
 
-        let y_offset = Vec4::from(camera_pos.1) * state.in_head_offset_y;
-        let z_offset = Vec4::from(camera_pos.2) * state.in_head_offset_z;
+        let mut camera_pos = Mat4::from_rotation_translation(
+            Quat::from_mat3a(&self.chr_cam.pers_cam.matrix.rotation()) * tracking_rotation,
+            head_pos.translation(),
+        );
 
-        let new_camera_pos = Vec4::from(camera_pos.3) + y_offset + z_offset;
-        camera_pos.3 = new_camera_pos.into();
+        let y_offset = camera_pos.row(1).with_w(0.0) * state.in_head_offset_y;
+        let z_offset = camera_pos.row(2).with_w(0.0) * state.in_head_offset_z;
 
-        camera_pos
+        camera_pos.w_axis += y_offset + z_offset;
+
+        camera_pos.into()
     }
 
     pub fn update_cs_cam(&mut self, state: &mut CameraState) {
@@ -339,7 +352,8 @@ impl CameraContext {
 
         let camera_pos = self.camera_position(state);
 
-        if !self.lock_tgt.is_locked_on && !self.player.is_on_ladder() && !self.player.is_in_throw()
+        if !self.lock_tgt.is_locked_on
+        // && !self.player.is_on_ladder() && !self.player.is_in_throw()
         {
             let lock_on_pos =
                 Vec4::from(camera_pos.3) + Vec4::from(self.chr_cam.pers_cam.matrix.2) * 10.0;
@@ -391,13 +405,28 @@ impl CameraContext {
         self.chr_cam.pers_cam.fov = fov;
     }
 
+    pub fn push_state(&mut self, state: &str) {
+        self.behavior_states.push_state(state);
+    }
+
     pub fn has_state(&self, name: &str) -> bool {
-        self.behavior_states.iter().any(|state| &**state == name)
+        self.behavior_states.has_state(name)
+    }
+}
+
+impl PersistentCameraContext {
+    fn new(samples: u32) -> Self {
+        Self {
+            frame: 0,
+            stabilizer: CameraStabilizer::new(samples),
+            head_tracker: HeadTracker::new(),
+            behavior_states: BehaviorStates::new(),
+        }
     }
 }
 
 impl CameraStabilizer {
-    fn new(samples: u32) -> Self {
+    const fn new(samples: u32) -> Self {
         Self {
             frame: 0,
             samples,
@@ -429,6 +458,70 @@ impl CameraStabilizer {
     }
 }
 
+impl HeadTracker {
+    const fn new() -> Self {
+        Self {
+            frame: 0,
+            last: Quat::IDENTITY,
+            rotation: Quat::IDENTITY,
+        }
+    }
+
+    fn next_tracked(&mut self, frame: u64, new: Mat3A) -> Quat {
+        let prev_frame = mem::replace(&mut self.frame, frame);
+
+        if prev_frame != frame {
+            let new = Quat::from_mat3a(&new);
+
+            if prev_frame + 1 != frame {
+                self.last = new;
+            }
+
+            self.rotation *= self.last.inverse() * new;
+            self.rotation = self.rotation.normalize();
+
+            self.last = new;
+        }
+
+        self.rotation
+    }
+
+    fn next_untracked(&mut self, frame: u64, new: Mat3A) -> Quat {
+        let prev_frame = mem::replace(&mut self.frame, frame);
+
+        if prev_frame == frame {
+            return self.rotation;
+        }
+
+        self.rotation = self.rotation.slerp(Quat::IDENTITY, 0.35).normalize();
+        self.last = Quat::from_mat3a(&new);
+
+        self.rotation
+    }
+}
+
+impl BehaviorStates {
+    const fn new() -> Self {
+        Self {
+            state_names: vec![],
+            erase_index: 0,
+        }
+    }
+
+    fn has_state(&self, name: &str) -> bool {
+        self.state_names.iter().any(|state| &**state == name)
+    }
+
+    fn push_state(&mut self, state: &str) {
+        self.state_names.push(state.into());
+    }
+
+    fn next_frame(&mut self) {
+        self.state_names.drain(..self.erase_index);
+        self.erase_index = self.state_names.len();
+    }
+}
+
 impl Deref for CameraControl {
     type Target = CameraState;
 
@@ -457,6 +550,7 @@ impl Default for CameraState {
             stabilizer_window: 0.3,
             stabilizer_factor: 0.8,
             use_stabilizer: true,
+            track_dodges: false,
             crosshair: CrosshairKind::Cross,
             crosshair_scale: (1.0, 1.0),
             use_fov_correction: true,
@@ -487,6 +581,7 @@ impl From<&Config> for CameraState {
         state.should_transition = config.gameplay.start_in_first_person;
         state.unlocked_movement = config.gameplay.unlocked_movement;
         state.prioritize_lock_on = config.gameplay.prioritize_lock_on;
+        state.track_dodges = config.gameplay.track_dodges;
 
         state.use_stabilizer = config.stabilizer.enabled;
         state.stabilizer_window = config.stabilizer.smoothing_window.clamp(0.1, 1.0);
@@ -497,6 +592,20 @@ impl From<&Config> for CameraState {
         state.crosshair_scale.1 = config.crosshair.scale_y.clamp(0.1, 4.0);
 
         state
+    }
+}
+
+impl Deref for CameraContext {
+    type Target = PersistentCameraContext;
+
+    fn deref(&self) -> &Self::Target {
+        &self.persistent_context
+    }
+}
+
+impl DerefMut for CameraContext {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.persistent_context
     }
 }
 
