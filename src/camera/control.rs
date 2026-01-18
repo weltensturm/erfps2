@@ -9,8 +9,8 @@ use std::{
 use eldenring::cs::{
     CSActionButtonMan, CSCamera, CSRemo, ChrCam, ChrExFollowCam, PlayerIns, WorldChrMan,
 };
-use fromsoftware_shared::{F32ModelMatrix, F32ViewMatrix, FromStatic};
-use glam::{EulerRot, Mat4, Quat, Vec3, Vec4};
+use fromsoftware_shared::{F32ViewMatrix, FromStatic};
+use glam::{EulerRot, Mat3A, Mat4, Quat, Vec3, Vec4};
 
 use crate::{
     config::{Config, CrosshairKind, FovCorrection, updater::ConfigUpdater},
@@ -320,17 +320,12 @@ impl CameraContext {
     pub fn camera_position(&mut self, state: &CameraState) -> F32ViewMatrix {
         let frame = self.frame;
 
-        let (_, head_rotation, mut head_pos) = {
-            let m = self.player.head_position();
-            Mat4::from_cols(m.0.into(), m.1.into(), m.2.into(), m.3.into())
-                .to_scale_rotation_translation()
-        };
+        let head_mtx = self.player.head_position();
 
-        let (_, mut camera_rotation, _) = {
-            let m = self.chr_cam.pers_cam.matrix;
-            Mat4::from_cols(m.0.into(), m.1.into(), m.2.into(), m.3.into())
-                .to_scale_rotation_translation()
-        };
+        let head_rotation = head_mtx.rotation();
+        let camera_rotation = Quat::from_mat3a(&self.chr_cam.pers_cam.matrix.rotation());
+
+        let mut head_pos = head_mtx.translation();
 
         if state.use_stabilizer {
             let player_mtx = Mat4::from(self.player.chr_ctrl.model_matrix);
@@ -344,18 +339,20 @@ impl CameraContext {
             );
         }
 
-        let tracking_rotation = if (state.track_dodges && (self.has_state(BehaviorState::Evasion)))
-            || self.player.is_in_throw()
+        let tracking_rotation = if self.player.is_in_throw()
+            || (state.track_dodges && self.has_state(BehaviorState::Evasion))
         {
             self.head_tracker.next_tracked(frame, head_rotation)
         } else {
             self.head_tracker.next_untracked(frame, head_rotation)
         };
-        camera_rotation *= tracking_rotation;
 
-        let cam_pitch = camera_rotation.to_euler(EulerRot::YXZ).1;
+        let camera_rotation = camera_rotation * tracking_rotation;
+
+        let cam_pitch = camera_rotation.to_euler(EulerRot::ZXY).1;
         let cam_pitch_exp = (cam_pitch.abs() / 3.0).powi(2);
-        let head_pitch = head_rotation.to_euler(EulerRot::YXZ).1;
+
+        let head_pitch = head_rotation.to_euler(EulerRot::ZXY).1;
         let head_upright = (1.0 - head_pitch.abs() / PI / 2.0).max(0.0).sqrt();
 
         let world_contrib = Vec3::new(0.0, 0.1, 0.0);
@@ -363,16 +360,11 @@ impl CameraContext {
         let cam_contrib =
             Vec3::new(0.0, 0.03 + cam_pitch_exp, -0.025 + cam_pitch.abs() / 12.0) * head_upright;
 
-        head_pos += world_contrib + head_rotation * head_contrib + camera_rotation * cam_contrib;
+        head_pos += world_contrib
+            + head_rotation.transpose() * head_contrib
+            + camera_rotation.inverse() * cam_contrib;
 
-        let camera_mtx = Mat4::from_rotation_translation(camera_rotation, head_pos);
-
-        F32ModelMatrix::new(
-            camera_mtx.x_axis.into(),
-            camera_mtx.y_axis.into(),
-            camera_mtx.z_axis.into(),
-            camera_mtx.w_axis.into(),
-        )
+        Mat4::from_rotation_translation(camera_rotation, head_pos).into()
     }
 
     pub fn update_cs_cam(&mut self, state: &mut CameraState) {
@@ -511,10 +503,12 @@ impl HeadTracker {
         }
     }
 
-    fn next_tracked(&mut self, frame: u64, new: Quat) -> Quat {
+    fn next_tracked(&mut self, frame: u64, new: Mat3A) -> Quat {
         let prev_frame = mem::replace(&mut self.frame, frame);
 
         if prev_frame != frame {
+            let new = Quat::from_mat3a(&new);
+
             if prev_frame + 1 != frame {
                 self.last = new;
             }
@@ -528,7 +522,7 @@ impl HeadTracker {
         self.rotation
     }
 
-    fn next_untracked(&mut self, frame: u64, new: Quat) -> Quat {
+    fn next_untracked(&mut self, frame: u64, new: Mat3A) -> Quat {
         let prev_frame = mem::replace(&mut self.frame, frame);
 
         if prev_frame == frame {
@@ -536,7 +530,7 @@ impl HeadTracker {
         }
 
         self.rotation = self.rotation.slerp(Quat::IDENTITY, 0.35).normalize();
-        self.last = new;
+        self.last = Quat::from_mat3a(&new);
 
         self.rotation
     }
