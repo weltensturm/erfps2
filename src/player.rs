@@ -1,5 +1,5 @@
-use eldenring::cs::{ChrAsmArmStyle, ChrIns, PlayerIns, ThrowNodeState, WorldChrMan};
-use fromsoftware_shared::{F32ModelMatrix, F32Vector4, F32ViewMatrix, FromStatic};
+use eldenring::cs::{CSModelIns, ChrAsmArmStyle, ChrIns, PlayerIns, ThrowNodeState, WorldChrMan};
+use fromsoftware_shared::{F32ModelMatrix, F32Vector4, F32ViewMatrix, FromStatic, OwnedPtr};
 use glam::Vec4;
 
 use crate::{
@@ -23,6 +23,8 @@ pub trait PlayerExt {
     fn make_transparent(&mut self, state: bool);
 
     fn enable_face_model(&mut self, state: bool);
+
+    fn enable_sheathed_weapons(&mut self, state: bool);
 
     fn has_action_request(&self) -> bool;
 
@@ -99,19 +101,11 @@ impl PlayerExt for PlayerIns {
 
     fn enable_face_model(&mut self, state: bool) {
         // Toggle face, helmet, hair, eyes, etc. visibility but still cast a shadow.
-        for parts_model_ins in self
-            .chr_asm_model_ins
-            .iter_mut()
-            .flat_map(|ptr| unsafe {
-                ptr.parts_model_ins
-                    .get_disjoint_unchecked_mut([0, 2, 6, 21, 22, 23, 24, 25])
-            })
-            .flatten()
-        {
-            // e.g. 0x100000A1 - visible, casts a shadow
-            //      0x100000A0 - invisible, casts a shadow.
-            parts_model_ins.model_disp_entity.disp_flags1 =
-                parts_model_ins.model_disp_entity.disp_flags1 & !1 | state as u32;
+        for parts in self.chr_asm_model_ins.iter_mut().flat_map(|ptr| unsafe {
+            ptr.parts_model_ins
+                .get_disjoint_unchecked_mut([0, 2, 6, 8, 12, 21, 22, 23, 24, 25])
+        }) {
+            enable_parts_visibilty(parts, state);
         }
 
         // Toggle back of head and ears visibility (which otherwise may clip into view).
@@ -126,6 +120,28 @@ impl PlayerExt for PlayerIns {
             let hood_model_mask2 = unsafe { chr_asm_model_res.add(0x50).as_mut() };
             *hood_model_mask2 = *hood_model_mask2 & !32 | (!state as u8) << 5;
         }
+    }
+
+    fn enable_sheathed_weapons(&mut self, state: bool) {
+        let Some(chr_asm_model_ins) = self.chr_asm_model_ins.as_mut() else {
+            return;
+        };
+
+        let [lh_weapon, rh_weapon] = unsafe {
+            chr_asm_model_ins
+                .parts_model_ins
+                .get_disjoint_unchecked_mut([7, 11])
+        };
+
+        let (lh_weapon_visibility, rh_weapon_visibility) =
+            match (state, self.chr_asm.equipment.arm_style) {
+                (false, ChrAsmArmStyle::LeftBothHands) => (true, false),
+                (false, ChrAsmArmStyle::RightBothHands) => (false, true),
+                _ => (true, true),
+            };
+
+        enable_parts_visibilty(lh_weapon, lh_weapon_visibility);
+        enable_parts_visibilty(rh_weapon, rh_weapon_visibility);
     }
 
     fn has_action_request(&self) -> bool {
@@ -166,5 +182,14 @@ impl PlayerExt for PlayerIns {
             self.chr_asm.equipment.arm_style,
             ChrAsmArmStyle::LeftBothHands | ChrAsmArmStyle::RightBothHands
         )
+    }
+}
+
+fn enable_parts_visibilty(parts: &mut Option<OwnedPtr<CSModelIns>>, state: bool) {
+    if let Some(parts) = parts {
+        // e.g. 0x100000A1 - visible, casts a shadow
+        //      0x100000A0 - invisible, casts a shadow.
+        parts.model_disp_entity.disp_flags1 =
+            parts.model_disp_entity.disp_flags1 & !1 | state as u32;
     }
 }

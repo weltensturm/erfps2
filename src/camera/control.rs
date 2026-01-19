@@ -298,6 +298,7 @@ impl CameraContext {
             state.set_crosshair_if(first_person);
 
             self.player.enable_face_model(!first_person);
+            self.player.enable_sheathed_weapons(!first_person);
 
             if !first_person {
                 self.player.make_transparent(false);
@@ -407,6 +408,7 @@ impl CameraContext {
         }
 
         self.player.enable_face_model(false);
+        self.player.enable_sheathed_weapons(false);
 
         if state.unobtrusive_dodges {
             self.player
