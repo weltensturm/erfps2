@@ -155,7 +155,9 @@ impl PlayerExt for PlayerIns {
     }
 
     fn is_sprinting(&self) -> bool {
-        self.module_container.behavior.sprint_state == 2
+        self.special_effect
+            .entries()
+            .any(|sp_effect| sp_effect.param_id == 100002)
     }
 
     fn is_sprint_requested(&self) -> bool {

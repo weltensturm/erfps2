@@ -445,6 +445,14 @@ impl CameraContext {
         f32::tan(state.fov.atan() * width_ratio)
     }
 
+    pub fn is_player_sprinting(&self, state: &CameraState) -> bool {
+        if state.unrestricted_sprint {
+            self.player.is_sprint_requested()
+        } else {
+            self.player.is_sprinting()
+        }
+    }
+
     pub fn push_state(&mut self, state: BehaviorState) {
         self.behavior_states.push_state(state);
     }
