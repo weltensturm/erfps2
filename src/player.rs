@@ -135,6 +135,7 @@ impl PlayerExt for PlayerIns {
     }
 
     fn enable_sheathed_weapons(&mut self, state: bool) {
+        let is_riding = self.is_riding();
         let Some(chr_asm_model_ins) = self.chr_asm_model_ins.as_mut() else {
             return;
         };
@@ -147,6 +148,7 @@ impl PlayerExt for PlayerIns {
 
         let (lh_weapon_visibility, rh_weapon_visibility) =
             match (state, self.chr_asm.equipment.arm_style) {
+                (false, ChrAsmArmStyle::OneHanded) if is_riding => (false, true),
                 (false, ChrAsmArmStyle::LeftBothHands) => (true, false),
                 (false, ChrAsmArmStyle::RightBothHands) => (false, true),
                 _ => (true, true),
