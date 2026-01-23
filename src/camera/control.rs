@@ -382,7 +382,7 @@ impl CameraContext {
 
         let camera_pos = self.camera_position(state);
 
-        if !self.lock_tgt.is_locked_on {
+        if state.soft_lock_on || !self.lock_tgt.is_locked_on {
             let lock_on_pos =
                 Vec4::from(camera_pos.3) + Vec4::from(self.chr_cam.pers_cam.matrix.2) * 10.0;
             self.player.set_lock_on_target_position(lock_on_pos);
