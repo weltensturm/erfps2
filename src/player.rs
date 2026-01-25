@@ -53,9 +53,9 @@ pub trait PlayerExt {
 
     fn is_2h(&self) -> bool;
 
-    fn lh_weapon_param(&self) -> Option<&'static EQUIP_PARAM_WEAPON_ST>;
+    fn lh_weapon_param(&self) -> Option<(u32, &'static EQUIP_PARAM_WEAPON_ST)>;
 
-    fn rh_weapon_param(&self) -> Option<&'static EQUIP_PARAM_WEAPON_ST>;
+    fn rh_weapon_param(&self) -> Option<(u32, &'static EQUIP_PARAM_WEAPON_ST)>;
 }
 
 impl PlayerExt for PlayerIns {
@@ -178,8 +178,13 @@ impl PlayerExt for PlayerIns {
             _ => (true, true),
         };
 
-        let lh_sheath_visibility = lh_weapon_param.is_some_and(|row| row.is_dual_blade() != 0);
-        let rh_sheath_visibility = rh_weapon_param.is_some_and(|row| row.is_dual_blade() != 0);
+        // Coded Sword uses the sheath model slot for its blade.
+        const CODED_SWORD_ID: u32 = 2110000;
+
+        let lh_sheath_visibility = lh_weapon_param
+            .is_some_and(|(id, row)| id == CODED_SWORD_ID || row.is_dual_blade() != 0);
+        let rh_sheath_visibility = rh_weapon_param
+            .is_some_and(|(id, row)| id == CODED_SWORD_ID || row.is_dual_blade() != 0);
 
         enable_parts_visibilty(lh_weapon, lh_weapon_visibility);
         enable_parts_visibilty(rh_weapon, rh_weapon_visibility);
@@ -242,37 +247,31 @@ impl PlayerExt for PlayerIns {
         self.chr_asm.equipment.arm_style == ChrAsmArmStyle::RightBothHands
             && self
                 .rh_weapon_param()
-                .is_none_or(|row| row.is_dual_blade() == 0)
+                .is_none_or(|(_, row)| row.is_dual_blade() == 0)
             || self.chr_asm.equipment.arm_style == ChrAsmArmStyle::LeftBothHands
                 && self
                     .lh_weapon_param()
-                    .is_none_or(|row| row.is_dual_blade() == 0)
+                    .is_none_or(|(_, row)| row.is_dual_blade() == 0)
     }
 
-    fn lh_weapon_param(&self) -> Option<&'static EQUIP_PARAM_WEAPON_ST> {
+    fn lh_weapon_param(&self) -> Option<(u32, &'static EQUIP_PARAM_WEAPON_ST)> {
         let chr_asm = self.chr_asm.as_ref();
 
-        let lh_slot = chr_asm.equipment.selected_slots.left_weapon_slot * 2;
-        let lh_weapon_param_id = chr_asm.equipment_param_ids[lh_slot as usize];
+        let slot = chr_asm.equipment.selected_slots.left_weapon_slot * 2;
+        let weapon_param_id = chr_asm.equipment_param_ids[slot as usize] as u32 / 100 * 100;
 
-        unsafe {
-            FD4ParamRepository::instance()
-                .ok()?
-                .get(lh_weapon_param_id as u32)
-        }
+        let weapon_param = unsafe { FD4ParamRepository::instance().ok()?.get(weapon_param_id)? };
+        Some((weapon_param_id, weapon_param))
     }
 
-    fn rh_weapon_param(&self) -> Option<&'static EQUIP_PARAM_WEAPON_ST> {
+    fn rh_weapon_param(&self) -> Option<(u32, &'static EQUIP_PARAM_WEAPON_ST)> {
         let chr_asm = self.chr_asm.as_ref();
 
-        let rh_slot = chr_asm.equipment.selected_slots.right_weapon_slot * 2 + 1;
-        let rh_weapon_param_id = chr_asm.equipment_param_ids[rh_slot as usize];
+        let slot = chr_asm.equipment.selected_slots.right_weapon_slot * 2 + 1;
+        let weapon_param_id = chr_asm.equipment_param_ids[slot as usize] as u32 / 100 * 100;
 
-        unsafe {
-            FD4ParamRepository::instance()
-                .ok()?
-                .get(rh_weapon_param_id as u32)
-        }
+        let weapon_param = unsafe { FD4ParamRepository::instance().ok()?.get(weapon_param_id)? };
+        Some((weapon_param_id, weapon_param))
     }
 }
 
