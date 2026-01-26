@@ -99,37 +99,44 @@ float2 MapUvBarrel(float2 uv)
     return uvp.xy / uvp.z;
 }
 
-bool CrosshairTest(float2 uv)
+float CrosshairAlpha(float2 uv)
 {
     float2 c = (uv - 0.5) * g_ErfpsCrosshairScaleReciprocal;
     float2 cScreen = c * float2(g_vCameraParam.x, 1.0) * g_dynamicScreenPercentage;
 
     int crosshairKind = (g_ErfpsFlags >> 2) & 7;
-    switch (crosshairKind)
-    {
+    switch (crosshairKind) {
+        default:
+            return 0.0;
         case 1: {
             cScreen = abs(cScreen);
-            return any(cScreen < 0.0014) && all(cScreen < 0.0080);
+            return any(cScreen < 0.0013) && all(cScreen < 0.007) ? 1.0 : 0.0;
         }
         case 2: {
-            float r = length(cScreen);
-            return r < 0.0018;
+            float r = length(cScreen) / 0.0018;
+            float d = fwidth(r);
+            float a = 1.0 - smoothstep(1.0 - d, 1.0 + d, r);
+            return a;
         }
         case 3: {
-            float r = length(cScreen);
-            return r > 0.0066 && r < 0.0080;
+            float2 r = length(cScreen) / float2(0.0066, 0.008);
+            float2 d = fwidth(r);
+            float2 a = 1.0 - smoothstep(1.0 - d, 1.0 + d, r);
+            return a.y - a.x;
         }
         case 4: {
-            float r = length(cScreen);
-            return (r > 0.0066 && r < 0.0080) || r < 0.0012;
+            float3 r = length(cScreen) / float3(0.0066, 0.008, 0.0012);
+            float3 d = fwidth(r);
+            float3 a = 1.0 - smoothstep(1.0 - d, 1.0 + d, r);
+            return a.y - a.x + a.z;
         }
         case 5: {
             cScreen = abs(cScreen);
             float s = cScreen.x + cScreen.y * 3.0;
-            return cScreen.x > 0.007 && s > 0.015 && s < 0.02;
+            float d = fwidth(s);
+            float a = smoothstep(0.015 - d, 0.0175, s) - smoothstep(0.0175, 0.02 + d, s);
+            return cScreen.x > 0.007 ? a : 0.0;
         }
-        default:
-            return false;
     }
 }
 
@@ -137,10 +144,12 @@ float4 PSMain(float4 position : SV_Position, float3 coord : TEXCOORD) : SV_TARGE
 {
     float2 xy = coord.xy;
 
-    if (CrosshairTest(xy)) {
+    float crosshairAlpha = CrosshairAlpha(xy);
+    if (crosshairAlpha > 0.001) {
         // Draw crosshair.
         float4 rgba = g_SourceTexture.SampleLevel(SS_ClampLinear, xy, 0);
-        return float4((1.0 - rgba.rgb) * 0.9, rgba.a);
+        rgba.rgb = lerp(rgba.rgb, 1.0 - rgba.rgb, crosshairAlpha);
+        return rgba;
     }
 
     if (g_ErfpsFlags & 1) {
