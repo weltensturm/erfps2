@@ -28,13 +28,11 @@ fn correct_screen_coords_fisheye(uv: Vec2) -> Vec2 {
     }
 
     let x = uvk.x.abs();
-    let mut y = x;
+    let mut y = x + 0.07 * (strength * x * x) - 0.5 * (strength * x * x) * x;
 
-    let f = |y: f32| strength * (y * y) * (y * y) + y - x;
-    let f_prime = |y: f32| 4.0 * strength * (y * y) * y + 1.0;
+    let f = |y: f32| (strength * (y * y)) * (y * y) + y - x;
+    let f_prime = |y: f32| 4.0 * (strength * (y * y)) * y + 1.0;
 
-    y -= f(y) / f_prime(y);
-    y -= f(y) / f_prime(y);
     y -= f(y) / f_prime(y);
 
     let uv = Vec2::new(y.copysign(uvk.x), uvk.y * y / x);
