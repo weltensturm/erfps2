@@ -316,7 +316,10 @@ impl CameraContext {
         let should_not_lock_on = (!state.prioritize_lock_on && is_lock_on_toggled)
             || (!self.lock_tgt.is_locked_on && is_lock_on_toggled);
 
-        if state.can_transition() && should_not_lock_on {
+        if state.can_transition()
+            && should_not_lock_on
+            && self.player.module_container.action_request.action_timers.r3 > 0.0
+        {
             state.should_transition = true;
 
             if !state.prioritize_lock_on {
