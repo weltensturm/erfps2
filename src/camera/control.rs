@@ -1,17 +1,20 @@
 use std::{
     collections::VecDeque,
     f32::consts::PI,
+    ffi::{CStr, c_char},
     mem,
     ops::{Deref, DerefMut},
     sync::{LazyLock, RwLock},
 };
 
+use bitvec::{BitArr, array::BitArray};
 use eldenring::cs::{
     CSActionButtonMan, CSCamera, CSRemo, ChrCam, ChrExFollowCam, ChrIns, FieldInsHandle,
     FieldInsType, GameDataMan, LockTgtMan, PlayerIns, WorldChrMan,
 };
 use fromsoftware_shared::{F32ViewMatrix, FromStatic};
 use glam::{EulerRot, Mat3A, Mat4, Quat, Vec3, Vec4};
+use strum::EnumCount;
 
 use crate::{
     config::{Config, CrosshairKind, FovCorrection, updater::ConfigUpdater},
@@ -90,7 +93,7 @@ pub struct PersistentCameraContext {
     behavior_states: BehaviorStates,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumCount)]
 pub enum BehaviorState {
     Attack,
     Evasion,
@@ -109,9 +112,13 @@ struct HeadTracker {
     rotation: Quat,
 }
 
+#[derive(Clone, Copy)]
+struct BehaviorStateSet {
+    bits: BitArr!(for BehaviorState::COUNT, in u8),
+}
+
 struct BehaviorStates {
-    state_names: Vec<BehaviorState>,
-    erase_index: usize,
+    sets: [BehaviorStateSet; 2],
 }
 
 impl CameraControl {
@@ -162,9 +169,8 @@ impl CameraControl {
     }
 
     pub fn next_frame(&mut self) {
-        if let Some(context) = &mut self.context {
-            context.frame += 1;
-            context.behavior_states.next_frame();
+        if let (_, Some(context)) = self.state_and_context() {
+            context.next_frame();
         }
     }
 }
@@ -502,12 +508,40 @@ impl CameraContext {
         }
     }
 
-    pub fn push_state(&mut self, state: BehaviorState) {
-        self.behavior_states.push_state(state);
-    }
-
     pub fn has_state(&self, state: BehaviorState) -> bool {
         self.behavior_states.has_state(state)
+    }
+
+    fn next_frame(&mut self) {
+        self.frame += 1;
+
+        let mut behavior_set = BehaviorStateSet::new();
+
+        for node in self
+            .player
+            .module_container
+            .behavior
+            .hkb_context
+            .hkb_character
+            .behavior_graph
+            .flat
+            .iter()
+            .map(|ptr| unsafe { ptr.as_ref() })
+        {
+            if node.flags[6] & 1 != 0 {
+                continue;
+            }
+
+            let name = unsafe { *node.unk08.byte_add(0x48).cast::<*const c_char>() };
+            if !name.is_null()
+                && let Ok(name) = unsafe { CStr::from_ptr(name).to_str() }
+                && let Ok(state) = name.try_into()
+            {
+                behavior_set.set_state(state);
+            }
+        }
+
+        self.behavior_states.push_state_set(behavior_set);
     }
 
     fn soft_lock_on(&mut self, camera_pos: F32ViewMatrix) {
@@ -627,41 +661,42 @@ impl HeadTracker {
     }
 }
 
+impl BehaviorStateSet {
+    const ZERO: Self = Self::new();
+
+    const fn new() -> Self {
+        Self {
+            bits: BitArray::ZERO,
+        }
+    }
+
+    fn set_state(&mut self, state: BehaviorState) {
+        self.bits.set(state as usize, true);
+    }
+}
+
 impl BehaviorStates {
     const fn new() -> Self {
         Self {
-            state_names: vec![],
-            erase_index: 0,
+            sets: [BehaviorStateSet::ZERO; 2],
         }
     }
 
     fn has_state(&self, state: BehaviorState) -> bool {
-        self.state_names.contains(&state)
+        (self.sets[0].bits | self.sets[1].bits)[state as usize]
     }
 
-    fn push_state(&mut self, state: BehaviorState) {
-        self.state_names.push(state);
-    }
-
-    fn next_frame(&mut self) {
-        self.state_names.drain(..self.erase_index);
-        self.erase_index = self.state_names.len();
+    fn push_state_set(&mut self, set: BehaviorStateSet) {
+        self.sets[1] = self.sets[0];
+        self.sets[0] = set;
     }
 }
 
 impl BehaviorState {
-    pub fn into_state_name(self) -> &'static str {
-        match self {
-            Self::Attack => "Attack_SM",
-            Self::Evasion => "Evasion_SM",
-            Self::Gesture => "Gesture_SM",
-        }
-    }
-
     pub fn try_from_state_name(name: &str) -> Option<Self> {
         match name {
             "Attack_SM" => Some(Self::Attack),
-            "Evasion_SM" => Some(Self::Evasion),
+            "Evasion_SM" | "Stealth_Rolling_CMSG" => Some(Self::Evasion),
             "Gesture_SM" => Some(Self::Gesture),
             _ => None,
         }
@@ -766,13 +801,7 @@ unsafe impl Send for CameraContext {}
 
 unsafe impl Sync for CameraContext {}
 
-impl From<BehaviorState> for &'static str {
-    fn from(value: BehaviorState) -> Self {
-        value.into_state_name()
-    }
-}
-
-impl TryFrom<&'_ str> for BehaviorState {
+impl TryFrom<&str> for BehaviorState {
     type Error = ();
 
     fn try_from(name: &'_ str) -> Result<Self, Self::Error> {

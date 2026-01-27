@@ -8,7 +8,6 @@ pub const CHR_CAN_TARGET_RVA: u32 = 0x51a8e1;
 pub const CHR_ROOT_MOTION_RVA: u32 = 0x466e20;
 pub const FOLLOW_CAM_FOLLOW_RVA: u32 = 0x3b6f30;
 pub const GAME_DATA_MAN_RVA: u32 = 0x3d5df38;
-pub const GET_BEH_GRAPH_DATA_RVA: u32 = 0x1446b10;
 pub const GET_DMY_POS_RVA: u32 = 0x3e95e0;
 pub const GX_FFX_DRAW_CONTEXT_RVA: u32 = 0x1d34fa5;
 pub const GX_FFX_DRAW_PASS_RVA: u32 = 0x1d21250;

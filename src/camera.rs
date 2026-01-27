@@ -1,7 +1,4 @@
-use std::{
-    ffi::{CStr, c_char, c_void},
-    mem, ptr,
-};
+use std::{ffi::c_void, mem, ptr};
 
 use eldenring::{
     cs::{
@@ -19,9 +16,9 @@ use crate::{
     player::PlayerExt,
     program::Program,
     rva::{
-        CAMERA_STEP_UPDATE_RVA, CHR_ROOT_MOTION_RVA, FOLLOW_CAM_FOLLOW_RVA, GET_BEH_GRAPH_DATA_RVA,
-        MMS_UPDATE_CHR_CAM_RVA, POSTURE_CONTROL_RIGHT_RVA, PUSH_TAE700_MODIFIER_RVA,
-        SET_WWISE_LISTENER_RVA, UPDATE_FE_MAN_RVA, UPDATE_FOLLOW_CAM_RVA, UPDATE_LOCK_TGT_RVA,
+        CAMERA_STEP_UPDATE_RVA, CHR_ROOT_MOTION_RVA, FOLLOW_CAM_FOLLOW_RVA, MMS_UPDATE_CHR_CAM_RVA,
+        POSTURE_CONTROL_RIGHT_RVA, PUSH_TAE700_MODIFIER_RVA, SET_WWISE_LISTENER_RVA,
+        UPDATE_FE_MAN_RVA, UPDATE_FOLLOW_CAM_RVA, UPDATE_LOCK_TGT_RVA,
     },
     shaders::screen::correct_screen_coords,
 };
@@ -170,21 +167,6 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
             }
         })
         .unwrap();
-
-        let get_beh_graph_data =
-            program
-                .derva_ptr::<unsafe extern "C" fn(*mut c_void, *mut c_void, u32) -> *mut c_void>(
-                    GET_BEH_GRAPH_DATA_RVA,
-                );
-
-        hook::install(get_beh_graph_data, |original| {
-            move |param_1, param_2, param_3| {
-                let result = original(param_1, param_2, param_3);
-                log_unwind!(update_player_behavior_state(result, param_2));
-                result
-            }
-        })
-        .unwrap();
     }
 
     Ok(())
@@ -236,6 +218,7 @@ unsafe fn update_lock_tgt(original: &dyn Fn()) {
             && !context.player.is_riding()
             && !context.player.has_action_request()
             && !context.player.is_in_throw()
+            && !context.has_state(BehaviorState::Evasion)
             && !context.has_state(BehaviorState::Gesture)
             && context.player.mimicry_asset < 0
         {
@@ -353,34 +336,4 @@ unsafe fn root_motion_modifier(
     let directional_root_motion = scaled_root_motion.rotate_y(movement_dir.xz().to_angle());
 
     Some(directional_root_motion.extend(1.0).into())
-}
-
-#[cfg_attr(debug_assertions, libhotpatch::hotpatch)]
-unsafe fn update_player_behavior_state(state_machine: *mut c_void, behavior_graph: *mut c_void) {
-    if !state_machine.is_null()
-        && let Some(player) = PlayerIns::main_player()
-        && ptr::addr_eq(
-            behavior_graph,
-            player
-                .module_container
-                .behavior
-                .hkb_context
-                .hkb_character
-                .behavior_graph,
-        )
-    {
-        let name = unsafe { *state_machine.byte_add(0x48).cast::<*const c_char>() };
-
-        if !name.is_null()
-            && let Ok(name) = unsafe { CStr::from_ptr(name).to_str() }
-        {
-            CameraControl::scope_mut(|control| {
-                if let (_, Some(context)) = control.state_and_context()
-                    && let Ok(state) = BehaviorState::try_from(name)
-                {
-                    context.push_state(state);
-                }
-            });
-        }
-    }
 }
