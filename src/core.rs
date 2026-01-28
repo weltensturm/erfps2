@@ -3,12 +3,12 @@ use std::{
     ffi::{CStr, c_char},
     mem,
     ops::{Deref, DerefMut},
-    sync::{LazyLock, RwLock},
+    sync::{LazyLock, Once, RwLock},
 };
 
 use eldenring::cs::{
-    CSActionButtonMan, CSRemo, ChrExFollowCam, ChrIns, FieldInsHandle, FieldInsType, GameDataMan,
-    LockTgtMan, PlayerIns,
+    CSActionButtonMan, CSEventFlagMan, CSRemo, ChrExFollowCam, ChrIns, FieldInsHandle,
+    FieldInsType, GameDataMan, LockTgtMan, PlayerIns,
 };
 use fromsoftware_shared::{F32ViewMatrix, FromStatic};
 use glam::{EulerRot, Mat3A, Mat4, Quat, Vec3, Vec4};
@@ -27,6 +27,7 @@ use crate::{
     raycast::cast_sphere,
     rva::CAM_WALL_RECOVERY_RVA,
     shaders::{enable_dithering, enable_fov_correction, enable_vfx_fade, set_crosshair},
+    tutorial::{TUTORIAL_EVENT_FLAG_ID, show_tutorial},
 };
 
 pub use behavior::BehaviorState;
@@ -235,6 +236,17 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
             } else {
                 self.chr_cam.ex_follow_cam.max_lock_target_offset = 0.0;
             }
+        }
+
+        if self.first_person()
+            && self
+                .player
+                .module_container
+                .action_request
+                .movement_request_duration
+                > 0.1
+        {
+            self.show_tutorial();
         }
 
         let is_lock_on_toggled = self.lock_tgt.is_locked_on != self.lock_tgt.is_lock_on_requested;
@@ -467,7 +479,6 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
             let name = unsafe { *node.unk08.byte_add(0x48).cast::<*const c_char>() };
             if !name.is_null()
                 && let Ok(name) = unsafe { CStr::from_ptr(name).to_str() }
-                && let _ = log::info!("{name}")
                 && let Ok(state) = name.try_into()
             {
                 behavior_set.set_state(state);
@@ -504,6 +515,22 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
             && field_ins_handle.selector.field_ins_type() == Some(FieldInsType::Chr)
         {
             self.lock_on_to(field_ins_handle);
+        }
+    }
+
+    fn show_tutorial(&self) {
+        if self.config.show_tutorial
+            && let Ok(event_flag) = unsafe { CSEventFlagMan::instance() }
+            && !event_flag
+                .virtual_memory_flag
+                .get_flag(TUTORIAL_EVENT_FLAG_ID)
+        {
+            event_flag
+                .virtual_memory_flag
+                .set_flag(TUTORIAL_EVENT_FLAG_ID, true);
+
+            static ONCE: Once = Once::new();
+            ONCE.call_once(show_tutorial);
         }
     }
 }

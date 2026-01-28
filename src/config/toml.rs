@@ -21,6 +21,7 @@ pub struct Fov {
 #[derive(Debug, Deserialize)]
 pub struct Gameplay {
     pub start_in_first_person: bool,
+    pub show_tutorial: bool,
     pub prioritize_lock_on: bool,
     pub soft_lock_on: bool,
     pub unlocked_movement: bool,

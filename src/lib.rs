@@ -17,6 +17,7 @@ mod program;
 mod raycast;
 mod rva;
 mod shaders;
+mod tutorial;
 
 fn main() -> eyre::Result<()> {
     let program = Program::try_current()?;

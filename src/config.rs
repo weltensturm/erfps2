@@ -16,6 +16,8 @@ pub struct Config {
 
     pub start_in_first_person: bool,
 
+    pub show_tutorial: bool,
+
     pub soft_lock_on: bool,
 
     pub prioritize_lock_on: bool,
@@ -84,6 +86,7 @@ impl From<toml::Config> for Config {
             fov,
             angle_limit: const { [f32::to_radians(-80.0), f32::to_radians(70.0)] },
             start_in_first_person: config.gameplay.start_in_first_person,
+            show_tutorial: config.gameplay.show_tutorial,
             prioritize_lock_on: config.gameplay.prioritize_lock_on,
             soft_lock_on: config.gameplay.soft_lock_on,
             unlocked_movement: config.gameplay.unlocked_movement,

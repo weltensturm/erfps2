@@ -67,6 +67,10 @@ pattern = "e8 $ { ' } 48 8b 0d ? ? ? ? 48 8b 74 24 40 48 8b 5c 24 30 48 85 c9 74
 captures = ["", "SET_WWISE_LISTENER_RVA"]
 
 [[patterns]]
+pattern = "48 8b b6 80 00 00 00 48 85 f6 74 ? 48 8b 41 18 48 8b 18 48 3b d8 74 ? 45 33 c9 45 33 c0 8b 53 10 48 8b ce e8 $ { ' } 84 c0 75"
+captures = ["", "SHOW_TUTORIAL_POPUP"]
+
+[[patterns]]
 pattern = "80 bb c0 82 00 00 00 75 ? 4c 8d 4d ? 4c 8b c7 0f 28 ce 48 8b cb e8 $ { ' }"
 captures = ["", "UPDATE_FE_MAN_RVA"]
 
