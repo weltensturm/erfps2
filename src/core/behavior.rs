@@ -4,6 +4,7 @@ use strum::EnumCount;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, EnumCount)]
 pub enum BehaviorState {
     Attack,
+    Damage,
     Evasion,
     Gesture,
 }
@@ -39,6 +40,7 @@ impl BehaviorState {
     pub fn try_from_state_name(name: &str) -> Option<Self> {
         match name {
             "Attack_SM" => Some(Self::Attack),
+            "Damage_SM" => Some(Self::Damage),
             "Evasion_SM" | "Stealth_Rolling_CMSG" => Some(Self::Evasion),
             "Gesture_SM" => Some(Self::Gesture),
             _ => None,

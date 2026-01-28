@@ -42,6 +42,9 @@ unobtrusive_dodges = false
 # Camera movement will be synchronized with head movement for dodges.
 track_dodges = false
 
+# Camera movement will be synchronized with head movement when the player is damaged.
+track_damage = false
+
 # Initial sprinting direction is restricted to moving forward.
 restricted_sprint = false
 

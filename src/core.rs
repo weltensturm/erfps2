@@ -276,6 +276,7 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
         }
 
         let tracking_rotation = if self.player.is_in_throw()
+            || (self.config.track_damage && self.has_state(BehaviorState::Damage))
             || (self.config.track_dodges && self.has_state(BehaviorState::Evasion))
         {
             self.head_tracker.next_tracked(frame, head_rotation)
@@ -466,11 +467,14 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
             let name = unsafe { *node.unk08.byte_add(0x48).cast::<*const c_char>() };
             if !name.is_null()
                 && let Ok(name) = unsafe { CStr::from_ptr(name).to_str() }
+                && let _ = log::info!("{name}")
                 && let Ok(state) = name.try_into()
             {
                 behavior_set.set_state(state);
             }
         }
+
+        log::info!("");
 
         self.behavior_states.push_state_set(behavior_set);
     }

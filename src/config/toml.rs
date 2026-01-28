@@ -26,6 +26,7 @@ pub struct Gameplay {
     pub unlocked_movement: bool,
     pub unobtrusive_dodges: bool,
     pub track_dodges: bool,
+    pub track_damage: bool,
     pub restricted_sprint: bool,
 }
 

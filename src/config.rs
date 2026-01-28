@@ -26,6 +26,8 @@ pub struct Config {
 
     pub track_dodges: bool,
 
+    pub track_damage: bool,
+
     pub restricted_sprint: bool,
 
     pub use_stabilizer: bool,
@@ -87,6 +89,7 @@ impl From<toml::Config> for Config {
             unlocked_movement: config.gameplay.unlocked_movement,
             unobtrusive_dodges: config.gameplay.unobtrusive_dodges,
             track_dodges: config.gameplay.track_dodges,
+            track_damage: config.gameplay.track_damage,
             restricted_sprint: config.gameplay.restricted_sprint,
             use_stabilizer: config.stabilizer.enabled,
             stabilizer_window,
