@@ -16,7 +16,6 @@ use crate::{
         world::{Void, World},
     },
     hooks::install::hook,
-    log_unwind,
     player::PlayerExt,
     program::Program,
     rva::{
@@ -35,32 +34,28 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
             .derva_ptr::<unsafe extern "C" fn(*mut c_void, *const FD4Time)>(CAMERA_STEP_UPDATE_RVA);
 
         hook(update, |original| {
-            move |param_1, param_2| {
-                log_unwind!(update_camera((*param_2).time, &|| original(
-                    param_1, param_2
-                )))
-            }
+            move |param_1, param_2| update_camera((*param_2).time, &|| original(param_1, param_2))
         });
 
         let mms_update =
             program.derva_ptr::<unsafe extern "C" fn(*mut c_void)>(MMS_UPDATE_CHR_CAM_RVA);
 
         hook(mms_update, |original| {
-            move |param_1| log_unwind!(update_move_map_step(&|| original(param_1)))
+            move |param_1| update_move_map_step(&|| original(param_1))
         });
 
         let lock_tgt_update =
             program.derva_ptr::<unsafe extern "C" fn(*mut c_void, f32)>(UPDATE_LOCK_TGT_RVA);
 
         hook(lock_tgt_update, |original| {
-            move |param_1, param_2| log_unwind!(update_lock_tgt(&|| original(param_1, param_2)))
+            move |param_1, param_2| update_lock_tgt(&|| original(param_1, param_2))
         });
 
         let chr_follow_cam_update =
             program.derva_ptr::<unsafe extern "C" fn(*mut ChrExFollowCam)>(UPDATE_FOLLOW_CAM_RVA);
 
         hook(chr_follow_cam_update, |original| {
-            move |param_1| log_unwind!(update_chr_follow_cam(&mut *param_1, &|| original(param_1)))
+            move |param_1| update_chr_follow_cam(&mut *param_1, &|| original(param_1))
         });
 
         let fe_man_update = program
@@ -70,7 +65,7 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
 
         hook(fe_man_update, |original| {
             move |param_1, param_2, param_3, param_4| {
-                log_unwind!(update_fe_man());
+                update_fe_man();
                 original(param_1, param_2, param_3, param_4);
             }
         });
@@ -102,11 +97,9 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
             move |param_1, param_2| {
                 let mut param_2 = param_2.read();
 
-                log_unwind!({
-                    if let Some(listener) = wwise_listener_for_fp() {
-                        param_2.matrix = listener;
-                    }
-                });
+                if let Some(listener) = wwise_listener_for_fp() {
+                    param_2.matrix = listener;
+                }
 
                 original(param_1, &param_2)
             }
@@ -122,7 +115,7 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
                 if let Some(player) = PlayerIns::main_player()
                     && &raw mut player.chr_ins == (*param_1).owner.as_ptr()
                 {
-                    log_unwind!(tae700_override(&mut *param_2));
+                    tae700_override(&mut *param_2);
                 }
 
                 original(param_1, param_2);
@@ -137,7 +130,7 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
 
         hook(posture_control_right, |original| {
             move |param_1, param_2, param_3, param_4| {
-                let posture_angle = log_unwind!(hand_posture_control(**param_1).unwrap_or(0));
+                let posture_angle = hand_posture_control(**param_1).unwrap_or(0);
                 original(param_1, param_2, param_3, param_4) + posture_angle
             }
         });
@@ -153,8 +146,7 @@ pub fn init_camera_update(program: Program) -> eyre::Result<()> {
             move |param_1, param_2, param_3, param_4| {
                 let mut param_3 = *param_3;
 
-                if let Some(root_motion) =
-                    log_unwind!(root_motion_modifier((*param_1).owner.as_ptr(), param_3))
+                if let Some(root_motion) = root_motion_modifier((*param_1).owner.as_ptr(), param_3)
                 {
                     param_3 = root_motion;
                 }
