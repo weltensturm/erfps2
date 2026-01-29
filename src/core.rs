@@ -211,41 +211,10 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
         self.should_transition = false;
 
         if should_transition && (!self.config.prioritize_lock_on || !self.lock_tgt.is_locked_on) {
-            self.first_person = !self.first_person;
-
-            self.lock_tgt.is_lock_on_requested = false;
-
-            self.update_fov_correction(self.fov());
-
-            let first_person = self.first_person();
-
-            enable_dithering(!first_person);
-            enable_vfx_fade(!first_person);
-
-            self.set_crosshair_if(first_person);
-
-            self.player.enable_face_model(!first_person);
-            self.player.enable_sheathed_weapons(!first_person);
-
-            if !first_person {
-                self.player.make_transparent(false);
-                self.lock_tgt.lock_camera = true;
-
-                self.chr_cam.ex_follow_cam.lock_chase_rate = 0.3;
-                self.chr_cam.ex_follow_cam.max_lock_target_offset = 0.05;
-            } else {
-                self.chr_cam.ex_follow_cam.max_lock_target_offset = 0.0;
-            }
+            self.transition();
         }
 
-        if self.first_person()
-            && self
-                .player
-                .module_container
-                .action_request
-                .movement_request_duration
-                > 0.1
-        {
+        if self.first_person() && self.can_show_tutorial() {
             self.show_tutorial();
         }
 
@@ -292,9 +261,11 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
             || (self.config.track_damage && self.has_state(BehaviorState::Damage))
             || (self.config.track_dodges && self.has_state(BehaviorState::Evasion))
         {
-            self.head_tracker.next_tracked(frame, frame_time, head_rotation)
+            self.head_tracker
+                .next_tracked(frame, frame_time, head_rotation)
         } else {
-            self.head_tracker.next_untracked(frame, frame_time, head_rotation)
+            self.head_tracker
+                .next_untracked(frame, frame_time, head_rotation)
         };
 
         let camera_rotation = camera_rotation * tracking_rotation;
@@ -445,6 +416,34 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
         self.behavior_states.has_state(state)
     }
 
+    fn transition(&mut self) {
+        self.first_person = !self.first_person;
+
+        self.lock_tgt.is_lock_on_requested = false;
+
+        self.update_fov_correction(self.fov());
+
+        let first_person = self.first_person();
+
+        enable_dithering(!first_person);
+        enable_vfx_fade(!first_person);
+
+        self.set_crosshair_if(first_person);
+
+        self.player.enable_face_model(!first_person);
+        self.player.enable_sheathed_weapons(!first_person);
+
+        if !first_person {
+            self.player.make_transparent(false);
+            self.lock_tgt.lock_camera = true;
+
+            self.chr_cam.ex_follow_cam.lock_chase_rate = 0.3;
+            self.chr_cam.ex_follow_cam.max_lock_target_offset = 0.05;
+        } else {
+            self.chr_cam.ex_follow_cam.max_lock_target_offset = 0.0;
+        }
+    }
+
     fn set_crosshair_if(&self, cond: bool) {
         let is_hud_enabled = unsafe {
             GameDataMan::instance().is_some_and(|game_data_man| game_data_man.is_hud_enabled())
@@ -519,9 +518,18 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
         }
     }
 
+    fn can_show_tutorial(&self) -> bool {
+        self.config.show_tutorial
+            && self
+                .player
+                .module_container
+                .action_request
+                .movement_request_duration
+                > 0.1
+    }
+
     fn show_tutorial(&self) {
-        if self.config.show_tutorial
-            && let Ok(event_flag) = unsafe { CSEventFlagMan::instance() }
+        if let Ok(event_flag) = unsafe { CSEventFlagMan::instance() }
             && !event_flag
                 .virtual_memory_flag
                 .get_flag(TUTORIAL_EVENT_FLAG_ID)
