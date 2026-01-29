@@ -287,13 +287,14 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
             );
         }
 
+        let frame_time = self.tpf;
         let tracking_rotation = if self.player.is_in_throw()
             || (self.config.track_damage && self.has_state(BehaviorState::Damage))
             || (self.config.track_dodges && self.has_state(BehaviorState::Evasion))
         {
-            self.head_tracker.next_tracked(frame, head_rotation)
+            self.head_tracker.next_tracked(frame, frame_time, head_rotation)
         } else {
-            self.head_tracker.next_untracked(frame, head_rotation)
+            self.head_tracker.next_untracked(frame, frame_time, head_rotation)
         };
 
         let camera_rotation = camera_rotation * tracking_rotation;
@@ -301,10 +302,8 @@ impl<'s> CoreLogicContext<'_, World<'s>> {
         let cam_pitch = camera_rotation.to_euler(EulerRot::ZXY).1;
         let cam_pitch_exp = (cam_pitch.abs() / 3.0).powi(2);
 
-        let (head_roll, head_pitch, _) = head_rotation.to_euler(EulerRot::ZXY);
-
-        let head_upright =
-            ((1.05 - head_pitch.abs() / PI) * (1.05 - head_roll.abs() / PI)).clamp(0.0, 1.0);
+        let head_pitch = head_rotation.to_euler(EulerRot::ZXY).1;
+        let head_upright = (1.0 - head_pitch.abs() / PI / 2.0).max(0.0).sqrt();
 
         let world_contrib = Vec3::new(0.0, 0.1, 0.0);
         let head_contrib = Vec3::new(0.0, -0.1 * head_upright, -0.05);

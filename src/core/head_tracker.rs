@@ -1,20 +1,16 @@
-use std::{
-    mem,
-    time::{Duration, Instant},
-};
+use std::mem;
 
 use glam::{Mat3A, Quat};
 
 pub struct HeadTracker {
     frame: u64,
-    last_frame: Instant,
     last: Quat,
     rotation: Quat,
     rotation_target: Quat,
 }
 
 impl HeadTracker {
-    pub fn next_tracked(&mut self, frame: u64, new: Mat3A) -> Quat {
+    pub fn next_tracked(&mut self, frame: u64, frame_time: f32, new: Mat3A) -> Quat {
         let prev_frame = mem::replace(&mut self.frame, frame);
 
         if prev_frame != frame {
@@ -27,39 +23,29 @@ impl HeadTracker {
             self.rotation_target *= self.last.inverse() * new;
             self.rotation_target = self.rotation_target.normalize();
             self.last = new;
-            self.rotate_towards_target();
+            self.rotate_towards_target(frame_time);
         }
 
         self.rotation
     }
 
-    pub fn next_untracked(&mut self, frame: u64, new: Mat3A) -> Quat {
+    pub fn next_untracked(&mut self, frame: u64, frame_time: f32, new: Mat3A) -> Quat {
         let prev_frame = mem::replace(&mut self.frame, frame);
 
-        if prev_frame == frame {
-            return self.rotation;
+        if prev_frame != frame {
+            self.rotation_target = Quat::IDENTITY;
+            self.rotate_towards_target(frame_time);
+            self.last = Quat::from_mat3a(&new);
         }
-        self.last = Quat::from_mat3a(&new);
 
-        self.rotation_target = Quat::IDENTITY;
-        self.rotate_towards_target();
         self.rotation
     }
 
-    fn rotate_towards_target(&mut self) {
-        let frame_time = self.update_frame();
-
+    fn rotate_towards_target(&mut self, frame_time: f32) {
         let distance = self.rotation.angle_between(self.rotation_target);
-        let step = rip(distance, 0.0, 1.0, frame_time.as_secs_f32());
+        let step = rip(distance, 0.0, 1.0, frame_time);
 
         self.rotation = self.rotation.rotate_towards(self.rotation_target, step);
-    }
-
-    fn update_frame(&mut self) -> Duration {
-        let now = Instant::now();
-        let frame_time = now - self.last_frame;
-        self.last_frame = now;
-        frame_time
     }
 }
 
@@ -67,7 +53,6 @@ impl Default for HeadTracker {
     fn default() -> Self {
         Self {
             frame: 0,
-            last_frame: Instant::now(),
             last: Quat::IDENTITY,
             rotation: Quat::IDENTITY,
             rotation_target: Quat::IDENTITY,
@@ -89,8 +74,8 @@ impl Default for HeadTracker {
     - Return step = distance - distance_new, clamped to \[0, distance\].
 */
 fn rip(distance: f32, curve_offset: f32, curve_scale: f32, timedelta: f32) -> f32 {
-    let sign = if distance < 0.0 { -1.0 } else { 1.0 };
-    let distance = distance * sign;
+    let sign = distance.signum();
+    let distance = distance.abs();
 
     let time_remaining = (distance + curve_offset).powf(1.0 / 6.0) / curve_scale;
     let time_new = (time_remaining - timedelta).max(0.0);
