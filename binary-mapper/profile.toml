@@ -51,6 +51,10 @@ pattern = "e8 $ { ' } 48 8b d8 eb 02 33 db 0f b7 44 24 30 66 89 43 10"
 captures = ["", "HKNP_SPHERE_SHAPE_RVA"]
 
 [[patterns]]
+pattern = "44 89 6c 24 28 44 88 64 24 20 4d 8b ce 4c 8b c7 48 8b d3 e8 $ { ' }"
+captures = ["", "LOAD_TPF_RES_CAP_RVA"]
+
+[[patterns]]
 pattern = "48 8b cb e8 $ { ' } f3 0f 10 4f 08 48 8b cb e8 ? ? ? ? f3 0f 10 4f 08 48 8b cb e8 ? ? ? ? 48 8b cb e8"
 captures = ["", "MMS_UPDATE_CHR_CAM_RVA"]
 

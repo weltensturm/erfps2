@@ -1,17 +1,19 @@
 use eldenring::{
-    cs::{CSMenuManImp, CSPopupMenu, MsgRepository},
+    cs::{CSMenuManImp, CSPopupMenu, MsgRepository, TpfRepository},
     fd4::FD4ParamRepository,
     param::TUTORIAL_PARAM_ST,
 };
 use fromsoftware_shared::FromStatic;
 
-use crate::{program::Program, rva::SHOW_TUTORIAL_POPUP};
+use crate::{program::Program, rva::SHOW_TUTORIAL_POPUP, tutorial::tpf::load_tutorial_tpf};
+
+mod tpf;
 
 pub const TUTORIAL_EVENT_FLAG_ID: u32 = 69009;
 
 const TUTORIAL_ROW_ID: u32 = 1000;
 const TUTORIAL_MSG_ID: u32 = 302420;
-const TUTORIAL_IMG_ID: u16 = 105;
+const TUTORIAL_IMG_ID: u16 = 18949;
 
 const TUTORIAL_TITLE: &str = "ERFPS (Ver.2)";
 const TUTORIAL_TEXT: &str = r#"Thank you for installing ERFPS!
@@ -21,7 +23,7 @@ To switch between 1st and 3rd person hold Interact and press Lock on.
 
 This mod can be configured in erfps2.toml without closing the game.
 
-<?keyicon@27?>+<?keyControlCamera?>: Switch perspectives"#;
+<?keyicon@27?>+<?keyicon@15?>: Switch perspectives"#;
 
 pub fn show_tutorial() {
     std::thread::spawn(show_tutorial_blocking);
@@ -36,7 +38,6 @@ struct OriginalContents<'r, 't> {
     original_text: Box<[u16]>,
 }
 
-#[unsafe(no_mangle)]
 pub fn show_tutorial_blocking() -> Option<bool> {
     let param_repository = unsafe { FD4ParamRepository::instance().ok()? };
     let tutorial_param_row = param_repository.get_mut::<TUTORIAL_PARAM_ST>(TUTORIAL_ROW_ID)?;
@@ -47,6 +48,9 @@ pub fn show_tutorial_blocking() -> Option<bool> {
 
     let menu_man = unsafe { CSMenuManImp::instance().ok()? };
     let popup_menu = unsafe { menu_man.popup_menu?.as_mut() };
+
+    let tpf_repo = unsafe { TpfRepository::instance().ok()? };
+    load_tutorial_tpf(tpf_repo);
 
     std::thread::sleep(std::time::Duration::from_millis(800));
 

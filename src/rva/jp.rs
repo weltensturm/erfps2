@@ -12,6 +12,7 @@ pub const GET_DMY_POS_RVA: u32 = 0x3e94d0;
 pub const GX_FFX_DRAW_CONTEXT_RVA: u32 = 0x1d34ee5;
 pub const GX_FFX_DRAW_PASS_RVA: u32 = 0x1d21190;
 pub const HKNP_SPHERE_SHAPE_RVA: u32 = 0x1883c20;
+pub const LOAD_TPF_RES_CAP_RVA: u32 = 0xb83680;
 pub const MMS_UPDATE_CHR_CAM_RVA: u32 = 0xb02390;
 pub const POSTURE_CONTROL_RIGHT_RVA: u32 = 0x40fdf0;
 pub const PUSH_TAE700_MODIFIER_RVA: u32 = 0x416c40;
