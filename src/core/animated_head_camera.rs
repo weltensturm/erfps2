@@ -15,6 +15,7 @@ use crate::{
 pub struct AnimatedHeadCamera {
     rotation_previous: Option<Quat>,
     rotation: Quat,
+    rotation_prev: Quat,
     rotation_target: Quat,
     stabilizer: CameraStabilizer,
     output: Option<Output>,
@@ -138,6 +139,8 @@ impl AnimatedHeadCamera {
     fn rotate_towards_target(&mut self, frame_time: f32, speed: f32, center_bias_until: f32) {
         let center_delta = self.rotation_target.angle_between(Quat::IDENTITY);
 
+        let smooth_prev = self.rotation_prev;
+
         let biased_target = if center_delta < center_bias_until {
             self.rotation_target.rotate_towards(
                 Quat::IDENTITY,
@@ -151,7 +154,58 @@ impl AnimatedHeadCamera {
         let step = rip(distance, 0.0, speed, frame_time);
 
         self.rotation = self.rotation.rotate_towards(biased_target, step);
+
+        let d_direct = self.rotation.angle_between(biased_target);
+
+        let waypoint = {
+            let momentum = (smooth_prev.inverse() * self.rotation).normalize();
+            let momentum_magnitude = momentum.angle_between(Quat::IDENTITY);
+            let momentum_scaled =
+                scale_rotation(momentum, (PI / 2.0).min(d_direct) / momentum_magnitude);
+
+            (self.rotation * momentum_scaled).normalize()
+        };
+
+        let follow_momentum = {
+            let towards_target = self.rotation.rotate_towards(biased_target, PI / 2.0);
+
+            d_direct > PI / 2.0 && towards_target.angle_between(waypoint) > PI / 12.0
+        };
+
+        let distance_to_waypoint = self.rotation.angle_between(waypoint);
+
+        let distance = if follow_momentum {
+            distance_to_waypoint + waypoint.angle_between(biased_target)
+        } else {
+            d_direct
+        };
+
+        let step = rip(distance, 0.0, speed, frame_time);
+
+        let next = if !follow_momentum {
+            self.rotation.rotate_towards(biased_target, step)
+        } else if step < distance_to_waypoint {
+            self.rotation.rotate_towards(waypoint, step)
+        } else {
+            waypoint.rotate_towards(biased_target, step - distance_to_waypoint)
+        };
+
+        self.rotation = next;
+
+        if d_direct > 0.000001 || d_direct < -0.000001 {
+            log::info!(
+                "\tfm:{follow_momentum}  \td_d:{d_direct:.3}\td:{distance:.3}\n\
+                 \tcd:{center_delta:.3}\ts:{step:.3}\n"
+            );
+        }
+        // // self.rotation = self
+        //     .rotation
+        //     .rotate_towards(biased_target, step);
     }
+}
+
+fn scale_rotation(r: Quat, scale: f32) -> Quat {
+    Quat::from_scaled_axis(r.to_scaled_axis() * scale)
 }
 
 impl FrameCache for AnimatedHeadCamera {
@@ -203,6 +257,11 @@ impl From<&CoreLogicContext<'_, World<'_>>> for Args {
             rotation_args.center_bias_until = PI * 1.25;
             rotation_args.player_local = true;
         } else if context.config.track_ashes && context.has_state(BehaviorState::AttackAsh) {
+            // Some attacks are very fast and erratic, check when changing parameters:
+            //     Bloodhound Fang
+            //     Black Knife: Blade of Death art (double spin)
+            //     Grave Scythe: Spinning Slash art, press twice
+            //     Mantis Blade: Spinning Slash art, press twice
             rotation_args.track = true;
             rotation_args.speed = 1.2;
             rotation_args.player_local = true;
